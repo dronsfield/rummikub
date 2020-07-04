@@ -3,15 +3,16 @@ import interact from "interactjs"
 import React from "react"
 import ReactDOM from "react-dom"
 import useDimensions from "./useDimensions"
+import { eventNames } from "process"
 
-// const SVG_NS = "http://www.w3.org/2000/svg"
+const SVG_NS = "http://www.w3.org/2000/svg"
 
 function setAttrs(
   el: HTMLElement | SVGGraphicsElement | SVGRectElement,
-  attrs: { [name: string]: string }
+  attrs: { [name: string]: any }
 ) {
   Object.entries(attrs).forEach(([key, value]) => {
-    el.setAttribute(key, value)
+    el.setAttribute(key, String(value))
   })
 }
 
@@ -99,52 +100,87 @@ const App = (props: any) => {
     setState((oldState) => ({ ...oldState, ...newState }))
   }, [])
 
-  const renderTile = React.useCallback(
+  const getRectProps = React.useCallback(
     (id: string, data: TileState) => {
-      if (!svgDimensions) return null
-      return (
-        <rect
-          id={id}
-          className="tile"
-          width={tileDims.width}
-          height={tileDims.height}
-          fill={tileColor}
-          x={0.5 * svgDimensions.width + (data.x - 0.5) * tileDims.width}
-          y={0.5 * svgDimensions.height + (data.y - 0.5) * tileDims.height}
-        />
-      )
+      return {
+        id,
+        className: "tile",
+        width: tileDims.width,
+        height: tileDims.height,
+        fill: tileColor,
+        x: 0.5 * (svgDimensions?.width || 0) + (data.x - 0.5) * tileDims.width,
+        y: 0.5 * (svgDimensions?.height || 0) + (data.y - 0.5) * tileDims.height
+      }
+    },
+    [svgDimensions]
+  )
+
+  const getCoordsFromPosition = React.useCallback(
+    (x: number, y: number) => {
+      if (!svgDimensions) return { x: 0, y: 0 }
+      return {
+        x: Math.floor((-0.5 * svgDimensions.width + x) / tileDims.width),
+        y: Math.floor((-0.5 * svgDimensions.height + y) / tileDims.height)
+      }
     },
     [svgDimensions]
   )
 
   React.useMemo(() => {
+    const getRectCentreFromDragEvent = (event: any) => {
+      return {
+        x: event.rect?.left + 0.5 * event.rect?.width,
+        y: event.rect?.top + 0.5 * event.rect?.height
+      }
+    }
+    const setShadowAttrs = (event: any) => {
+      const rectCentre = getRectCentreFromDragEvent(event)
+      const coords = getCoordsFromPosition(rectCentre.x, rectCentre.y)
+      const rectProps = getRectProps("shadow", {
+        location: "DRAG_SHADOW",
+        x: coords.x,
+        y: coords.y
+      })
+      setAttrs(document.getElementById("shadow") as any, {
+        ...rectProps,
+        className: "",
+        fill: "#ddd"
+      })
+    }
     interact(".tile").draggable({
       listeners: {
         start: (event) => {
           console.log("START", { event })
         },
         move: (event) => {
+          setShadowAttrs(event)
           analyseEvent(event)
-          // setAttrs(event.target, {
-          //   transform: `translate(${event.page.x - event.x0}, ${
-          //     event.page.y - event.y0
-          //   })`
-          // })
+          setAttrs(event.target, {
+            transform: `translate(${event.page.x - event.x0}, ${
+              event.page.y - event.y0
+            })`
+          })
         },
         end: (event) => {
           console.log("END", { event })
           setAttrs(event.target, { transform: "" })
+          const rectCentre = getRectCentreFromDragEvent(event)
+          const coords = getCoordsFromPosition(rectCentre.x, rectCentre.y)
+          updateState({
+            [event.target.id]: { location: "TABLE", ...coords }
+          })
         }
       }
     })
-  }, [])
+  }, [getCoordsFromPosition, getRectProps, updateState])
 
   return (
     <>
       <pre id="anapre" style={{ position: "fixed", top: 0, right: 0 }} />
       <svg id="the-svg" ref={svgRef}>
+        <rect id="shadow" />
         {Object.entries(state).map(([id, data]) => {
-          return renderTile(id, data)
+          return <rect key={id} {...getRectProps(id, data)} />
         })}
       </svg>
     </>
