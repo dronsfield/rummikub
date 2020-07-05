@@ -119,8 +119,8 @@ const App = (props: any) => {
     (x: number, y: number) => {
       if (!svgDimensions) return { x: 0, y: 0 }
       return {
-        x: Math.floor((-0.5 * svgDimensions.width + x) / tileDims.width),
-        y: Math.floor((-0.5 * svgDimensions.height + y) / tileDims.height)
+        x: Math.floor((-0.5 * svgDimensions.width + x) / tileDims.width + 0.5),
+        y: Math.floor((-0.5 * svgDimensions.height + y) / tileDims.height + 0.5)
       }
     },
     [svgDimensions]
@@ -134,8 +134,9 @@ const App = (props: any) => {
       }
     }
     const setShadowAttrs = (event: any) => {
-      const rectCentre = getRectCentreFromDragEvent(event)
-      const coords = getCoordsFromPosition(rectCentre.x, rectCentre.y)
+      // const rectCentre = getRectCentreFromDragEvent(event)
+      const coords = getCoordsFromPosition(event.page.x, event.page.y)
+      console.log(`(${coords.x}, ${coords.y})`)
       const rectProps = getRectProps("shadow", {
         location: "DRAG_SHADOW",
         x: coords.x,
@@ -164,8 +165,8 @@ const App = (props: any) => {
         end: (event) => {
           console.log("END", { event })
           setAttrs(event.target, { transform: "" })
-          const rectCentre = getRectCentreFromDragEvent(event)
-          const coords = getCoordsFromPosition(rectCentre.x, rectCentre.y)
+          // const rectCentre = getRectCentreFromDragEvent(event)
+          const coords = getCoordsFromPosition(event.page.x, event.page.y)
           updateState({
             [event.target.id]: { location: "TABLE", ...coords }
           })
@@ -174,10 +175,33 @@ const App = (props: any) => {
     })
   }, [getCoordsFromPosition, getRectProps, updateState])
 
+  const renderGrid = () => {
+    return new Array(20).fill(0).map((_, index) => {
+      const x =
+        (index - 10.5) * tileDims.width + 0.5 * (svgDimensions?.width || 0)
+      const y =
+        (index - 10.5) * tileDims.height + 0.5 * (svgDimensions?.height || 0)
+      return (
+        <>
+          <line
+            x1={x}
+            x2={x}
+            y1={0}
+            y2={svgDimensions?.height}
+            stroke="black"
+          />
+          <text x={x} y={20} fill="red" children={x} />
+          <line x1={0} x2={svgDimensions?.width} y1={y} y2={y} stroke="black" />
+        </>
+      )
+    })
+  }
+
   return (
     <>
       <pre id="anapre" style={{ position: "fixed", top: 0, right: 0 }} />
       <svg id="the-svg" ref={svgRef}>
+        {renderGrid()}
         <rect id="shadow" />
         {Object.entries(state).map(([id, data]) => {
           return <rect key={id} {...getRectProps(id, data)} />
